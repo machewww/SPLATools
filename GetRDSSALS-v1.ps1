@@ -1,4 +1,4 @@
-$FilePath = "C:\Scripts\SPLA\Expports"
+$FilePath = "C:\Scripts\SPLA\Exports"
 $Group = ""
 
 Import-Module ActiveDirectory

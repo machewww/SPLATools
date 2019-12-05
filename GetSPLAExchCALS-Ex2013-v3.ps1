@@ -1,18 +1,28 @@
-﻿Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn;
+﻿
+
+param( 
+        [Parameter(ValueFromPipeline = $True)] 
+            [string[]]$DestinationEmailPrefix,
+            [string]$DestinationEmailDomain,
+            [string]$SourceDomain,
+            [string]$MailContactPrefix
+
+
+        ) 
+
+
+Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn;
 
 
 $SvrName="$env:computername.$env:userdnsdomain"
 
 $SvrEmail="$env:computername@$env:userdnsdomain"
 
-#$smtpServer = "127.0.0.1"
+$DestinationEmail = "${DestinationEmailPrefix}@$env:userdnsdomain"
 
+$smtpServer = "127.0.0.1"
 
-#GenCap - FIXED
-if ($env:userdnsdomain -eq "gencap.local"){$smtpServer = "172.25.180.25"}
-#WAR - FIXED
-if ($env:userdnsdomain -eq "domain.warchildcan"){$smtpServer = "192.168.208.26"}
-
+$DestinationEmail = "${DestinationEmailPrefix}@$env:userdnsdomain"
 
 $path = "C:\temp\SPLA"
 
@@ -23,7 +33,7 @@ If(!(test-path $path))
 
 
 
-$MailContactCheck = Get-MailContact -Identity "JoleraSPLAReporting@$env:userdnsdomain" -ErrorAction SilentlyContinue 
+$MailContactCheck = Get-MailContact -Identity "$DestinationEmailPrefix@$env:userdnsdomain" -ErrorAction SilentlyContinue 
 $MailContactExists = $? 
 
         If ($MailContactExists -eq $True)  
@@ -32,8 +42,9 @@ $MailContactExists = $?
         } 
         Else  
         { 
-            New-MailContact -Name "JoleraSPLAReporting" -ExternalEmailAddress jolerasplareceiver@jolera.com    
+            New-MailContact -Name $MailContactPrefix -ExternalEmailAddress $DestinationEmail    
         } 
+
 
 
 
@@ -655,65 +666,15 @@ $msg = new-object Net.Mail.MailMessage
 $smtp = new-object Net.Mail.SmtpClient($smtpServer)
 
 
-if ($env:userdnsdomain -eq "gencap.local"){
 
-$msg.From = "GC-MAIL01@generationcapital.com"
 
-}
-else
-{
-$msg.From = $SvrEmail
-}
+$msg.To.Add("$MailContactPrefix@$SourceDomain")
 
 
 
+Send-MailMessage -from $svrfromemail -To $recipients -Subject "SPLA Report from $SvrEmail" -smptServer smtp.server -Attachments $att
 
-if ($env:userdnsdomain -eq "sdi"){
-
-$msg.From = "SD-DC-EXCH1@sdimtg.com"
-
-}
-else
-{
-$msg.From = $SvrEmail
-}
-
-
-if ($env:userdnsdomain -eq "sdi"){
-
-$msg.To.Add("JoleraSPLAReporting@sdimktg.com")
-
-}
-else
-{
-
-$msg.To.Add("JoleraSPLAReporting@$env:userdnsdomain")
-}
-
-
-if ($env:userdnsdomain -eq "gencap.local"){
-
-$msg.To.Add("JoleraSPLAReporting@generationcapital.com")
-
-}
-else
-{
-
-$msg.To.Add("JoleraSPLAReporting@$env:userdnsdomain")
-}
-
-
-if ($env:userdnsdomain -eq "domain.warchildcan"){
-
-$msg.To.Add("JoleraSPLAReporting@warchild.ca")
-
-}
-else
-{
-
-$msg.To.Add("JoleraSPLAReporting@$env:userdnsdomain")
-}
-
+Send-MailMessage -from $svrfromemail -To $recipients -Subject "SPLA Report from $SvrEmail" -smptServer smtp.server -Attachments $att2
 
 
 
