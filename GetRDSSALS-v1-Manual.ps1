@@ -1,25 +1,9 @@
-
-Param (
-    [Parameter(Mandatory = $false)]
-    [ValidateNotNullorEmpty()]
-    [string[]]$Group,
-
-    [Parameter(Mandatory = $false)]
-    [ValidateNotNullorEmpty()]
-    [string[]]$FTPUser,
-    
-    [Parameter(Mandatory = $false)]
-    [ValidateNotNullorEmpty()]
-    [string[]]$FTPPWD,
-
-    [Parameter(Mandatory = $false)]
-    [ValidateNotNullorEmpty()]
-    [string[]]$FTPUrl
-)
-
+$FTPUrl = ""
+$FTPPWD = ""
+$FTPUser = ""
+$Group = ""
 
 $OutputFileName = "SPLA-RDSCount-$Group-$(get-date -f yyyy-MM-dd).csv"
-
 
 #Create it doesnt exist
 $FilePath = "C:\SPLA\Exports"
@@ -40,11 +24,3 @@ $uri = New-Object -TypeName System.Uri -ArgumentList $ftp
 
 Write-Host -Object "Uploading $File..."
 $webclient.UploadFile($uri, $File)
-
-
-
-
-
-
-
-
