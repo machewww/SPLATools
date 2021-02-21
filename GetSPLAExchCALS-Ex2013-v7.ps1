@@ -1,10 +1,10 @@
 ﻿
 
-Param (
-    [Parameter(Mandatory = $false)]
-    [ValidateNotNullorEmpty()]
-    [string[]]$Group,
+#
+#
+# file.ps1 
 
+Param (
     [Parameter(Mandatory = $false)]
     [ValidateNotNullorEmpty()]
     [string[]]$FTPUser,
@@ -18,6 +18,8 @@ Param (
     [string[]]$FTPUrl
 )
 
+
+$svrname = $env:COMPUTERNAME
 Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn;
 
 $path = "C:\SPLA\Exports"
@@ -183,15 +185,20 @@ function Output-Report {
 # Only user, shared and linked mailboxes are counted.  
 # Resource mailboxes and legacy mailboxes are NOT counted. 
 # Oliver Moazzezi - I have set the equals value to 15, for Exchange 2013
+$Activemailboxes = Get-Mailbox -resultsize unlimited  | select alias,identity,ExchangeUserAccountControl| where { $_.ExchangeUserAccountControl -ne 'AccountDisabled'}
+
+  #$AllMailboxIDs=$null
+ foreach ($mbx in $Activemailboxes) {
+     Get-Recipient -ResultSize 'Unlimited' -Filter $UserMailboxFilter -Identity $mbx.Alias |select * | foreach { 
+        $Mailbox = $_ 
+        if ($Mailbox.ExchangeVersion.ExchangeBuild.Major -eq 15) { 
+            $AllMailboxIDs[$Mailbox.Identity] = $null 
+            $Script:TotalMailboxes++ 
+        } 
+        $AllVersionMailboxIDs[$Mailbox.Identity] = $null 
+     }
+ }
  
-Get-Recipient -ResultSize 'Unlimited' -Filter $UserMailboxFilter | foreach { 
-    $Mailbox = $_ 
-    if ($Mailbox.ExchangeVersion.ExchangeBuild.Major -eq 15) { 
-        $AllMailboxIDs[$Mailbox.Identity] = $null 
-        $Script:TotalMailboxes++ 
-    } 
-    $AllVersionMailboxIDs[$Mailbox.Identity] = $null 
-} 
  
 if ($TotalMailboxes -eq 0) { 
     # No mailboxes in the org. Just output the report and exit 
@@ -311,52 +318,54 @@ $activeSyncMailboxPolicies | foreach {
                     $Script:ActiveSyncMailboxPolicyWithECALFeature[$ASPolicy.Identity] = $null 
                 } 
 } 
- 
-Get-Recipient -ResultSize 'Unlimited' -Filter $UserMailboxFilter -PropertySet 'ConsoleLargeSet' | foreach {   
-    $Mailbox = $_ 
+ #######################################################FIX
+ foreach ($mbx in $Activemailboxes) {
+         Get-Recipient -ResultSize 'Unlimited' -Filter $UserMailboxFilter -PropertySet 'ConsoleLargeSet' -Identity $mbx.Alias |select *  | foreach {   
+  
+        $Mailbox = $_ 
      
-    if ($Mailbox.ExchangeVersion.ExchangeBuild.Major -eq 15) 
-    { 
-        # UM usage classifies the user as an Enterprise CAL    
-        if ($Mailbox.UMEnabled) 
+        if ($Mailbox.ExchangeVersion.ExchangeBuild.Major -eq 15) 
         { 
-            $Script:UMUserCount++ 
-            $Script:EnterpriseCALMailboxIDs[$Mailbox.Identity] = $null 
-        } 
-         
-        # LOCAL Archive Mailbox classifies the user as an Enterprise CAL 
-        if ($Mailbox.ArchiveState -eq "Local") { 
-            $Script:ArchiveUserCount++ 
-            $Script:EnterpriseCALMailboxIDs[$Mailbox.Identity] = $null 
-        } 
-         
-        # Retention Policy classifies the user as an Enterprise CAL 
-        if (($Mailbox.RetentionPolicy -ne $null) -and $Script:RetentionPolicyWithPersonalTag.Contains($Mailbox.RetentionPolicy)) { 
-            # For online archive, we will not consider it as ECAL if it's caused by MoveToAchiveTag 
-            if (($Mailbox.ArchiveState -eq "HostedProvisioned") -or ($Mailbox.ArchiveState -eq "HostedPending")) 
+            # UM usage classifies the user as an Enterprise CAL    
+            if ($Mailbox.UMEnabled) 
             { 
-                if ($Script:RetentionPolicyWithPersonalTagNonArchive.Contains($Mailbox.RetentionPolicy)) 
+                $Script:UMUserCount++ 
+                $Script:EnterpriseCALMailboxIDs[$Mailbox.Identity] = $null 
+            } 
+         
+            # LOCAL Archive Mailbox classifies the user as an Enterprise CAL 
+            if ($Mailbox.ArchiveState -eq "Local") { 
+                $Script:ArchiveUserCount++ 
+                $Script:EnterpriseCALMailboxIDs[$Mailbox.Identity] = $null 
+            } 
+         
+            # Retention Policy classifies the user as an Enterprise CAL 
+            if (($Mailbox.RetentionPolicy -ne $null) -and $Script:RetentionPolicyWithPersonalTag.Contains($Mailbox.RetentionPolicy)) { 
+                # For online archive, we will not consider it as ECAL if it's caused by MoveToAchiveTag 
+                if (($Mailbox.ArchiveState -eq "HostedProvisioned") -or ($Mailbox.ArchiveState -eq "HostedPending")) 
+                { 
+                    if ($Script:RetentionPolicyWithPersonalTagNonArchive.Contains($Mailbox.RetentionPolicy)) 
+                    { 
+                        $Script:RetentionPolicyUserCount++ 
+                        $Script:EnterpriseCALMailboxIDs[$Mailbox.Identity] = $null 
+                    } 
+                } 
+                else 
                 { 
                     $Script:RetentionPolicyUserCount++ 
                     $Script:EnterpriseCALMailboxIDs[$Mailbox.Identity] = $null 
                 } 
             } 
-            else 
-            { 
-                $Script:RetentionPolicyUserCount++ 
-                $Script:EnterpriseCALMailboxIDs[$Mailbox.Identity] = $null 
-            } 
+    # Oliver Moazzezi - Managed Folder Policies not support 
+            # MRM Managed Custom Folder usage classifies the user as an Enterprise CAL 
+            #if (($Mailbox.ManagedFolderMailboxPolicy -ne $null) -and ($Script:ManagedFolderMailboxPolicyWithCustomedFolder.Contains($Mailbox.ManagedFolderMailboxPolicy))) 
+            #{     
+                 #$Script:ManagedCustomFolderUserCount++ 
+                 #$Script:EnterpriseCALMailboxIDs[$Mailbox.Identity] = $null 
+            #} 
         } 
-# Oliver Moazzezi - Managed Folder Policies not support 
-        # MRM Managed Custom Folder usage classifies the user as an Enterprise CAL 
-        #if (($Mailbox.ManagedFolderMailboxPolicy -ne $null) -and ($Script:ManagedFolderMailboxPolicyWithCustomedFolder.Contains($Mailbox.ManagedFolderMailboxPolicy))) 
-        #{     
-             #$Script:ManagedCustomFolderUserCount++ 
-             #$Script:EnterpriseCALMailboxIDs[$Mailbox.Identity] = $null 
-        #} 
     } 
 } 
- 
 # Advanced ActiveSync policies classify the user as an Enterprise CAL 
 # Oliver Moazzezi - modified to use Get-MobileDeviceMailboxPolicy
 Get-CASMailbox -ResultSize 'Unlimited' -Filter 'ActiveSyncEnabled -eq $true' | foreach { 
@@ -422,11 +431,18 @@ foreach ($ManagementScope in $ManagementScopes.Values) {
     if (-not([System.String]::IsNullOrEmpty($ManagementScope.RecipientFilter))) { 
         $Filter = "(" + $ManagementScope.RecipientFilter + ") -and (" + $Filter + ")" 
     } 
-    Get-Recipient -ResultSize 'Unlimited'-OrganizationalUnit $ManagementScope.RecipientRoot -Filter $Filter | foreach { 
-        if ($_.ExchangeVersion.ExchangeBuild.Major -eq 15) { 
-            $ExcludedMailboxes[$_.Identity] = $true 
+#######################################################FIX
+    
+    
+    
+    foreach ($mbx in $Activemailboxes) {
+   #OLD Get-Recipient -ResultSize 'Unlimited' -Filter $UserMailboxFilter |select * | where alias -eq $mbx.alias| foreach { 
+        Get-Recipient -ResultSize 'Unlimited'-OrganizationalUnit $ManagementScope.RecipientRoot -Filter $Filter -Identity $mbx.Alias |select *  | foreach { 
+            if ($_.ExchangeVersion.ExchangeBuild.Major -eq 15) { 
+                $ExcludedMailboxes[$_.Identity] = $true 
+            } 
         } 
-    } 
+    }
 } 
  
 # Oliver Moazzezi - multi mailbox search is not an Enterprise CAL feature anymore http://office.microsoft.com/en-gb/exchange/microsoft-exchange-server-licensing-licensing-overview-FX103746915.aspx
@@ -518,9 +534,10 @@ function Get-JournalingGroupMailboxMember
                 write-error $errorMessage 
                 return 
             } 
- 
-            Get-Recipient -RecipientPreviewFilter $varGroup.LdapRecipientFilter -OrganizationalUnit $varGroup.RecipientContainer -ResultSize 'Unlimited' | foreach { 
-                Traverse-GroupMember $_ 
+            foreach ($mbx in $Activemailboxes) {
+                Get-Recipient -RecipientPreviewFilter $varGroup.LdapRecipientFilter -OrganizationalUnit $varGroup.RecipientContainer -ResultSize 'Unlimited' -Identity $mbx.Alias |select *  | foreach { 
+                    Traverse-GroupMember $_ 
+                }
             } 
         }  
  

@@ -28,7 +28,7 @@ if (Test-Path $FilePath){ write-host "The Source folder already exists." } else 
 
 Import-Module ActiveDirectory
 
-$Members = Get-ADGroupMember -Identity "$Group" -Recursive | select distinguishedname
+$Members = Get-ADGroupMember -Identity $Group -Recursive | select distinguishedname
 $Members | Export-Csv -Path $FilePath\$OutputFileName -NoTypeInformation -Encoding UTF8
 
 $File = "$FilePath\$OutputFileName"
